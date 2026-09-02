@@ -1,0 +1,46 @@
+{
+  "collections": [
+    {
+      "name": "sellers",
+      "documentId": "uid",
+      "fields": {
+        "businessName": { "type": "string" },
+        "category": { "type": "string" },
+        "shopDescription": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "whatsappNumber": { "type": "string" },
+        "facebookUrl": { "type": "string" },
+        "instagramUrl": { "type": "string" },
+        "tiktokUrl": { "type": "string" },
+        "createdAt": { "type": "timestamp" },
+        "isVerified": { "type": "boolean" }
+      },
+      "securityRules": {
+        "read": "true",
+        "create": "request.auth != null && request.auth.uid == documentId",
+        "update": "request.auth != null && request.auth.uid == documentId",
+        "delete": "request.auth != null && request.auth.uid == documentId"
+      }
+    },
+    {
+      "name": "products",
+      "fields": {
+        "sellerId": { "type": "string", "reference": "sellers" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "imageUrls": { "type": "array" },
+        "createdAt": { "type": "timestamp" },
+        "isFeatured": { "type": "boolean" },
+        "isAvailable": { "type": "boolean" }
+      },
+      "securityRules": {
+        "read": "true",
+        "create": "request.auth != null && request.resource.data.sellerId == request.auth.uid",
+        "update": "request.auth != null && resource.data.sellerId == request.auth.uid",
+        "delete": "request.auth != null && resource.data.sellerId == request.auth.uid"
+      }
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "WAGA SHOP",
+  "description": "Le marché digital N°1 à Ouagadougou. Achetez et vendez facilement en direct sur WhatsApp.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
