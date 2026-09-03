@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../../lib/firebase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -228,6 +228,37 @@ export default function SellerLogin({ initialIsLogin = true }: SellerLoginProps)
           : 'Network error. Please check your internet connection.';
       default:
         return fallbackMessage || (language === 'FR' ? 'Une erreur est survenue.' : 'An error occurred.');
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      setError(language === 'FR' ? 'Veuillez entrer votre adresse email pour réinitialiser votre mot de passe.' : 'Please enter your email address to reset your password.');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setNotification({
+        type: 'success',
+        title: language === 'FR' ? 'Email Envoyé' : 'Email Sent',
+        message: language === 'FR' 
+          ? 'Un lien de réinitialisation a été envoyé à votre adresse email.' 
+          : 'A password reset link has been sent to your email address.',
+      });
+    } catch (err: any) {
+      console.error("Reset password error:", err);
+      const friendly = getFriendlyErrorMessage(err.code, err.message);
+      setError(friendly);
+      setNotification({
+        type: 'error',
+        title: language === 'FR' ? 'Erreur' : 'Error',
+        message: friendly,
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -508,7 +539,18 @@ export default function SellerLogin({ initialIsLogin = true }: SellerLoginProps)
           </div>
           
           <div>
-            <label className="block text-[10px] font-bold text-zinc-700 dark:text-zinc-300 mb-3 uppercase tracking-widest">{t('password')}</label>
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-[10px] font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">{t('password')}</label>
+              {isLogin && (
+                <button
+                  type="button"
+                  onClick={handleResetPassword}
+                  className="text-[10px] font-bold text-red-600 hover:text-red-700 dark:text-red-500 dark:hover:text-red-400 uppercase tracking-widest transition-colors cursor-pointer"
+                >
+                  {language === 'FR' ? 'Mot de passe oublié ?' : 'Forgot Password?'}
+                </button>
+              )}
+            </div>
             <input
               type="password"
               required
