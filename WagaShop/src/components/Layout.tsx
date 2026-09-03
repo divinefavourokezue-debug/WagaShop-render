@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Search, Heart, Globe, Sun, Moon, Bell, PlusCircle, Phone, Menu, X } from 'lucide-react';
+import { Home, Search, Heart, Globe, Sun, Moon, Bell, PlusCircle, Phone, Menu, X, Settings as SettingsIcon, User } from 'lucide-react';
 import { useAuth } from './AuthProvider';
 import { useLanguageTheme } from '../context/LanguageThemeContext';
 import { OfflineIndicator } from './OfflineIndicator';
@@ -161,21 +161,39 @@ export function Layout() {
             })}
           </nav>
 
-          {/* Quick Controls: Compact Language Toggle */}
+          {/* Quick Controls: Compact Language Toggle & Settings */}
           <div className="flex items-center gap-2">
             <button
               onClick={toggleLanguage}
               title={language === 'FR' ? "Switch to English" : "Passer en Français"}
               className={cn(
-                "flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all border cursor-pointer",
+                "flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all border cursor-pointer",
                 isDark 
                   ? "bg-zinc-900 border-white/10 hover:border-red-600/50 text-zinc-300 hover:text-white" 
                   : "bg-zinc-100 border-zinc-200 hover:border-red-400 text-zinc-700 hover:text-red-700"
               )}
             >
-              <Globe size={12} className="text-blue-500 dark:text-blue-400" />
+              <Globe size={13} className="text-blue-500 dark:text-blue-400" />
               <span>{language}</span>
             </button>
+
+            <Link
+              to="/settings"
+              title={language === 'FR' ? "Paramètres & Compte" : "Settings & Preferences"}
+              className={cn(
+                "flex items-center justify-center w-8 h-8 rounded-xl transition-all border cursor-pointer relative",
+                location.pathname === '/settings'
+                  ? "bg-red-600 text-white border-red-600 shadow-sm"
+                  : (isDark 
+                      ? "bg-zinc-900 border-white/10 text-zinc-300 hover:text-white hover:border-red-500/50" 
+                      : "bg-zinc-100 border-zinc-200 text-zinc-700 hover:text-red-600 hover:border-red-300")
+              )}
+            >
+              <SettingsIcon size={15} />
+              {user && (
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-white dark:border-zinc-950" />
+              )}
+            </Link>
           </div>
         </div>
       </header>
@@ -228,6 +246,10 @@ export function Layout() {
             <Phone size={13} />
             <span>{t('adminContact')}</span>
           </a>
+          
+          <Link to="/settings" className="text-xs font-semibold text-zinc-500 hover:text-red-600 dark:text-zinc-400 dark:hover:text-red-500 transition-colors">
+            {language === 'FR' ? 'Paramètres' : 'Settings'}
+          </Link>
           
           <Link to="/privacy" className="text-xs font-semibold text-zinc-500 hover:text-red-600 dark:text-zinc-400 dark:hover:text-red-500 transition-colors">
             {language === 'FR' ? 'Confidentialité' : 'Privacy'}
@@ -286,6 +308,22 @@ export function Layout() {
                   </Link>
                 );
               })}
+
+              <Link
+                to="/settings"
+                onClick={() => setIsMobileNavOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 transition-all p-3 rounded-2xl border-t border-zinc-100 dark:border-zinc-800/80 pt-2.5",
+                  location.pathname === '/settings' 
+                    ? "bg-red-50 dark:bg-red-600/10 text-red-600 dark:text-red-500" 
+                    : (isDark ? "text-zinc-300 hover:bg-zinc-800" : "text-zinc-700 hover:bg-zinc-100")
+                )}
+              >
+                <SettingsIcon size={20} className={location.pathname === '/settings' ? "text-red-600 dark:text-red-500" : ""} />
+                <span className="text-xs font-black uppercase tracking-wider pr-4">
+                  {language === 'FR' ? 'Paramètres' : 'Settings'}
+                </span>
+              </Link>
             </motion.div>
           )}
         </AnimatePresence>

@@ -118,12 +118,23 @@ export default function SellerDashboard() {
     const fetchProducts = async () => {
       if (!user) return;
       let fetched: Product[] = [];
+      let fetchSucceeded = false;
       try {
         const q = query(collection(db, 'products'), where('sellerId', '==', user.uid));
         const snapshot = await getDocs(q);
         fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+        fetchSucceeded = true;
       } catch (error) {
         console.error("Error fetching products:", error);
+      }
+
+      if (!fetchSucceeded && user) {
+        try {
+          const cached = localStorage.getItem(`waga_cached_seller_prods_${user.uid}`);
+          if (cached) {
+            fetched = JSON.parse(cached);
+          }
+        } catch {}
       }
 
       // Merge local offline products for this seller
@@ -135,8 +146,10 @@ export default function SellerDashboard() {
         fetched = [...newLocals, ...fetched];
       } catch {}
 
-      setProducts(fetched);
-      if (user) {
+      if (fetched.length > 0 || fetchSucceeded) {
+        setProducts(fetched);
+      }
+      if (user && fetchSucceeded && fetched.length > 0) {
         try {
           localStorage.setItem(`waga_cached_seller_prods_${user.uid}`, JSON.stringify(fetched));
         } catch {}
@@ -167,6 +180,17 @@ export default function SellerDashboard() {
           const localOffline: Product[] = JSON.parse(localStorage.getItem('waga_offline_products') || '[]');
           const updated = localOffline.filter(p => p.id !== productId);
           localStorage.setItem('waga_offline_products', JSON.stringify(updated));
+        } catch {}
+
+        if (user) {
+          try {
+            const cached = JSON.parse(localStorage.getItem(`waga_cached_seller_prods_${user.uid}`) || '[]');
+            localStorage.setItem(`waga_cached_seller_prods_${user.uid}`, JSON.stringify(cached.filter((p: any) => p.id !== productId)));
+          } catch {}
+        }
+        try {
+          const cachedAll = JSON.parse(localStorage.getItem('waga_products_cache') || '[]');
+          localStorage.setItem('waga_products_cache', JSON.stringify(cachedAll.filter((p: any) => p.id !== productId)));
         } catch {}
 
         setProducts(products.filter(p => p.id !== productId));
@@ -249,14 +273,23 @@ export default function SellerDashboard() {
         </div>
         
         <div className="flex items-center gap-2">
-          <Link to="/seller/add-product" className="bg-red-600 text-white font-bold py-2.5 px-6 rounded-full flex items-center gap-2 hover:bg-red-700 transition-colors shadow-md shadow-red-600/30">
-            <Plus size={20} /> Ajouter Produit
+          <Link to="/seller/add-product" className="bg-red-600 text-white font-bold py-2.5 px-5 rounded-full flex items-center gap-2 hover:bg-red-700 transition-colors shadow-md shadow-red-600/30 text-xs uppercase tracking-wider">
+            <Plus size={18} /> {language === 'FR' ? 'Ajouter Produit' : 'Add Product'}
           </Link>
-          <button className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-white/10 flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-800 dark:text-white transition-colors">
-            <Settings size={20} />
-          </button>
-          <button onClick={handleLogout} className="w-10 h-10 rounded-full bg-red-600/10 text-red-600 dark:text-red-500 border border-red-600/30 flex items-center justify-center hover:bg-red-600/20 transition-colors">
-            <LogOut size={20} />
+          <Link 
+            to="/seller/settings" 
+            title={language === 'FR' ? 'Paramètres de la boutique' : 'Shop settings'}
+            className="flex items-center gap-1.5 py-2.5 px-3.5 rounded-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-white/10 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-800 dark:text-white transition-colors text-xs font-bold"
+          >
+            <Settings size={16} />
+            <span className="hidden sm:inline">{language === 'FR' ? 'Paramètres' : 'Settings'}</span>
+          </Link>
+          <button 
+            onClick={handleLogout} 
+            title={language === 'FR' ? 'Déconnexion' : 'Logout'}
+            className="w-10 h-10 rounded-full bg-red-600/10 text-red-600 dark:text-red-500 border border-red-600/30 flex items-center justify-center hover:bg-red-600/20 transition-colors cursor-pointer"
+          >
+            <LogOut size={18} />
           </button>
         </div>
       </div>

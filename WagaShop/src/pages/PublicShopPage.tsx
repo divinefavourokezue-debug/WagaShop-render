@@ -40,6 +40,14 @@ export default function PublicShopPage() {
         }
       } catch (error) {
         console.error("Error fetching shop data:", error);
+        // Fallback to cache
+        try {
+          const cachedProds: Product[] = JSON.parse(localStorage.getItem('waga_products_cache') || '[]');
+          const shopProds = cachedProds.filter(p => p.sellerId === id);
+          if (shopProds.length > 0) {
+            setProducts(shopProds);
+          }
+        } catch {}
       } finally {
         setLoading(false);
       }

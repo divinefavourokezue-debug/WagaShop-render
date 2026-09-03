@@ -121,6 +121,14 @@ export default function ProductPage() {
         }
       } catch (error) {
         console.error("Error fetching product:", error);
+        // Fallback to cache if network fetch failed
+        try {
+          const cachedProds: Product[] = JSON.parse(localStorage.getItem('waga_products_cache') || '[]');
+          const match = cachedProds.find(p => p.id === id);
+          if (match) {
+            setProduct(match);
+          }
+        } catch {}
       } finally {
         setLoading(false);
       }

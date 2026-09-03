@@ -18,16 +18,45 @@ export default function SearchPage() {
 
   useEffect(() => {
     const fetchAllProducts = async () => {
+      let fetched: Product[] = [];
+      let fetchSucceeded = false;
       try {
         const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
         const snapshot = await getDocs(q);
-        const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
-        setProducts(fetched);
+        fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+        fetchSucceeded = true;
       } catch (error) {
-        console.error("Error fetching products:", error);
-      } finally {
-        setLoading(false);
+        console.warn("Error fetching products from Firestore in search:", error);
       }
+
+      // If network fetch failed, preserve cached products
+      if (!fetchSucceeded) {
+        try {
+          const cached = localStorage.getItem('waga_products_cache');
+          if (cached) {
+            fetched = JSON.parse(cached);
+          }
+        } catch {}
+      }
+
+      // Merge local offline products queue if present
+      try {
+        const localOffline: Product[] = JSON.parse(localStorage.getItem('waga_offline_products') || '[]');
+        const newLocals = localOffline.filter(lo => !fetched.some(f => f.id === lo.id));
+        fetched = [...newLocals, ...fetched];
+      } catch {}
+
+      if (fetched.length > 0 || fetchSucceeded) {
+        setProducts(fetched);
+      }
+
+      if (fetchSucceeded && fetched.length > 0) {
+        try {
+          localStorage.setItem('waga_products_cache', JSON.stringify(fetched));
+        } catch {}
+      }
+
+      setLoading(false);
     };
     fetchAllProducts();
   }, []);

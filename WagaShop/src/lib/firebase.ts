@@ -6,8 +6,8 @@ import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 
-// Set log level to error to avoid noisy lease acquisition and network retry messages
-setLogLevel('error');
+// Set log level to silent to prevent transient connection retry notifications from triggering system errors
+setLogLevel('silent');
 
 export const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true,

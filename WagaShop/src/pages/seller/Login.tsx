@@ -220,8 +220,12 @@ export default function SellerLogin({ initialIsLogin = true }: SellerLoginProps)
       case 'auth/wrong-password':
       case 'auth/invalid-credential':
         return language === 'FR' 
-          ? 'Email ou mot de passe incorrect.' 
-          : 'Incorrect email or password.';
+          ? 'Email ou mot de passe incorrect. (Avez-vous d\'abord créé votre boutique ?)' 
+          : 'Incorrect email or password. (Have you created a shop yet?)';
+      case 'auth/network-request-failed':
+        return language === 'FR'
+          ? 'Erreur réseau. Veuillez vérifier votre connexion internet.'
+          : 'Network error. Please check your internet connection.';
       default:
         return fallbackMessage || (language === 'FR' ? 'Une erreur est survenue.' : 'An error occurred.');
     }
@@ -277,7 +281,9 @@ export default function SellerLogin({ initialIsLogin = true }: SellerLoginProps)
         navigate('/seller');
       }
     } catch (err: any) {
-      console.error("Auth submit error:", err);
+      if (err.code !== 'auth/invalid-credential' && err.code !== 'auth/wrong-password' && err.code !== 'auth/user-not-found' && err.code !== 'auth/network-request-failed') {
+        console.error("Auth submit error:", err);
+      }
       const friendly = getFriendlyErrorMessage(err.code, err.message);
       setError(friendly);
       setNotification({

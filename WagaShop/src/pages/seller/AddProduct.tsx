@@ -228,6 +228,20 @@ export default function AddProduct() {
         } catch {}
       }
 
+      // Prepend to product caches immediately so it appears instantly across homepage, seller dashboard, and search
+      try {
+        const fullItem = { ...productPayload, id: docRefId || ('local_' + Date.now()) };
+        const cachedAll = JSON.parse(localStorage.getItem('waga_products_cache') || '[]');
+        const updatedAll = [fullItem, ...cachedAll.filter((p: any) => p.id !== fullItem.id)];
+        localStorage.setItem('waga_products_cache', JSON.stringify(updatedAll));
+
+        if (user) {
+          const cachedSeller = JSON.parse(localStorage.getItem(`waga_cached_seller_prods_${user.uid}`) || '[]');
+          const updatedSeller = [fullItem, ...cachedSeller.filter((p: any) => p.id !== fullItem.id)];
+          localStorage.setItem(`waga_cached_seller_prods_${user.uid}`, JSON.stringify(updatedSeller));
+        }
+      } catch {}
+
       // Trigger local storage notification event for buyers
       try {
         localStorage.setItem('waga_last_new_product', JSON.stringify({

@@ -49,8 +49,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setSellerProfile(null);
       }
-    } catch (error) {
-      console.error("Error fetching seller profile:", error);
+    } catch (error: any) {
+      if (error?.code !== 'unavailable') {
+        console.warn("Notice: seller profile unavailable offline:", error?.message || error);
+      }
     }
   };
 

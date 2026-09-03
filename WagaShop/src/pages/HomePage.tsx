@@ -56,14 +56,26 @@ export default function HomePage() {
     try {
       const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'), limit(50));
       let fetchedProducts: Product[] = [];
+      let fetchSucceeded = false;
       try {
         const snapshot = await getDocs(q);
         fetchedProducts = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as Product[];
+        fetchSucceeded = true;
       } catch (err) {
         console.warn("Firestore fetch error, fallback to offline/cached products:", err);
+      }
+
+      // If network fetch failed, preserve cached products
+      if (!fetchSucceeded) {
+        try {
+          const cached = localStorage.getItem('waga_products_cache');
+          if (cached) {
+            fetchedProducts = JSON.parse(cached);
+          }
+        } catch {}
       }
 
       // Merge local offline products queue if present
@@ -76,11 +88,15 @@ export default function HomePage() {
         }
       } catch {}
 
-      setProducts(fetchedProducts);
+      if (fetchedProducts.length > 0 || fetchSucceeded) {
+        setProducts(fetchedProducts);
+      }
 
-      try {
-        localStorage.setItem('waga_products_cache', JSON.stringify(fetchedProducts));
-      } catch {}
+      if (fetchSucceeded && fetchedProducts.length > 0) {
+        try {
+          localStorage.setItem('waga_products_cache', JSON.stringify(fetchedProducts));
+        } catch {}
+      }
     } catch (error) {
       console.error("Error fetching homepage data:", error);
     } finally {
