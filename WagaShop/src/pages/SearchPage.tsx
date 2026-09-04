@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Product } from '../types';
+import { getInitialProductsSync, getCachedProducts, saveProductsCache, shouldFetchFromNetwork } from '../lib/productCache';
 import { Link } from 'react-router-dom';
 import { formatPrice } from '../lib/utils';
 import { Search as SearchIcon, Mic, Heart, MessageCircle } from 'lucide-react';
@@ -11,13 +12,28 @@ import { ProductSkeletonCard } from './HomePage';
 
 export default function SearchPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<Product[]>(getInitialProductsSync);
+  const [loading, setLoading] = useState(() => getInitialProductsSync().length === 0);
   const [sortBy, setSortBy] = useState<'newest' | 'price_asc' | 'price_desc'>('newest');
   const { t, language } = useLanguageTheme();
 
   useEffect(() => {
     const fetchAllProducts = async () => {
+      // 1. Immediately ensure rich cached data from IndexedDB is loaded
+      try {
+        const cached = await getCachedProducts();
+        if (cached.length > 0) {
+          setProducts(cached);
+          setLoading(false);
+        }
+      } catch {}
+
+      // 2. If offline or fresh cache already present, save reads!
+      if (!shouldFetchFromNetwork()) {
+        setLoading(false);
+        return;
+      }
+
       let fetched: Product[] = [];
       let fetchSucceeded = false;
       try {
@@ -29,16 +45,6 @@ export default function SearchPage() {
         console.warn("Error fetching products from Firestore in search:", error);
       }
 
-      // If network fetch failed, preserve cached products
-      if (!fetchSucceeded) {
-        try {
-          const cached = localStorage.getItem('waga_products_cache');
-          if (cached) {
-            fetched = JSON.parse(cached);
-          }
-        } catch {}
-      }
-
       // Merge local offline products queue if present
       try {
         const localOffline: Product[] = JSON.parse(localStorage.getItem('waga_offline_products') || '[]');
@@ -46,14 +52,9 @@ export default function SearchPage() {
         fetched = [...newLocals, ...fetched];
       } catch {}
 
-      if (fetched.length > 0 || fetchSucceeded) {
-        setProducts(fetched);
-      }
-
       if (fetchSucceeded && fetched.length > 0) {
-        try {
-          localStorage.setItem('waga_products_cache', JSON.stringify(fetched));
-        } catch {}
+        setProducts(fetched);
+        await saveProductsCache(fetched);
       }
 
       setLoading(false);

@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { doc, getDoc, collection, query, where, getDocs, limit, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Product, Seller } from '../types';
+import { getCachedProducts, addRecentlyViewed } from '../lib/productCache';
 import { formatPrice } from '../lib/utils';
 import { useSavedStore } from '../store/useSavedStore';
 import { useLanguageTheme } from '../context/LanguageThemeContext';
@@ -52,12 +53,41 @@ export default function ProductPage() {
   useEffect(() => {
     const fetchProductAndSeller = async () => {
       if (!id) return;
+
+      // 1. Instantly check cached products (offline-first, zero waiting)
+      let foundInCache: Product | null = null;
+      try {
+        const cachedList = await getCachedProducts();
+        const match = cachedList.find(p => p.id === id);
+        if (match) {
+          foundInCache = match;
+          setProduct(match);
+          setLoading(false);
+          addRecentlyViewed(match);
+
+          // Populate similar products from cache immediately
+          if (match.category) {
+            const similar = cachedList
+              .filter(p => p.category === match.category && p.id !== match.id)
+              .slice(0, 4);
+            setSimilarProducts(similar);
+          }
+        }
+      } catch {}
+
+      // If offline and we found the product in cache, we're done!
+      if (typeof navigator !== 'undefined' && !navigator.onLine && foundInCache) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const docRef = doc(db, 'products', id);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const productData = { id: docSnap.id, ...docSnap.data() } as Product;
           setProduct(productData);
+          setLoading(false);
           
           // Increment views
           if (!productData.id.startsWith('local_')) {
@@ -76,59 +106,28 @@ export default function ProductPage() {
               const similarSnap = await getDocs(q);
               const similar = similarSnap.docs
                 .map(d => ({ id: d.id, ...d.data() } as Product))
-                .filter(p => p.id !== productData.id); // Exclude current product
+                .filter(p => p.id !== productData.id);
               setSimilarProducts(similar);
             } catch (err) {
               console.error("Error fetching similar products:", err);
             }
           }
           
-          // Add to recently viewed
-          try {
-            const recent = JSON.parse(localStorage.getItem('waga_recently_viewed') || '[]');
-            const strippedProduct = {
-              id: productData.id,
-              name: productData.name,
-              price: productData.price,
-              imageUrls: productData.imageUrls?.slice(0, 1) || [],
-              category: productData.category,
-              location: productData.location || '',
-              city: productData.city || '',
-              isAvailable: productData.isAvailable,
-              sellerId: productData.sellerId,
-              startingPrice: productData.startingPrice || 0
-            };
-            const updated = [strippedProduct, ...recent.filter((p: Product) => p.id !== productData.id)].slice(0, 15);
-            
-            // If quota is still exceeded, clear some caches
-            try {
-              localStorage.setItem('waga_recently_viewed', JSON.stringify(updated));
-            } catch (err) {
-              localStorage.removeItem('waga_products_cache'); // Clear heavy caches
-              localStorage.setItem('waga_recently_viewed', JSON.stringify(updated));
-            }
-          } catch (e) {
-            console.error("Error saving recently viewed", e);
-          }
+          // Safely add to recently viewed without deleting products cache!
+          addRecentlyViewed(productData);
           
           if (productData.sellerId) {
-            const sellerRef = doc(db, 'sellers', productData.sellerId);
-            const sellerSnap = await getDoc(sellerRef);
-            if (sellerSnap.exists()) {
-              setSeller({ id: sellerSnap.id, ...sellerSnap.data() } as Seller);
-            }
+            try {
+              const sellerRef = doc(db, 'sellers', productData.sellerId);
+              const sellerSnap = await getDoc(sellerRef);
+              if (sellerSnap.exists()) {
+                setSeller({ id: sellerSnap.id, ...sellerSnap.data() } as Seller);
+              }
+            } catch {}
           }
         }
       } catch (error) {
-        console.error("Error fetching product:", error);
-        // Fallback to cache if network fetch failed
-        try {
-          const cachedProds: Product[] = JSON.parse(localStorage.getItem('waga_products_cache') || '[]');
-          const match = cachedProds.find(p => p.id === id);
-          if (match) {
-            setProduct(match);
-          }
-        } catch {}
+        console.warn("Network fetch failed in product page, using cache if available:", error);
       } finally {
         setLoading(false);
       }

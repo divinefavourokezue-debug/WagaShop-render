@@ -28,6 +28,8 @@ import { BURKINA_CITIES } from '../constants/cities';
 import { auth, db } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { getCachedProducts, saveProductsCache, clearAllProductsCache } from '../lib/productCache';
+import { Product } from '../types';
 
 export default function UserSettingsPage() {
   const { user, sellerProfile } = useAuth();
@@ -54,12 +56,9 @@ export default function UserSettingsPage() {
     }
 
     // Count cached items
-    try {
-      const cached = JSON.parse(localStorage.getItem('waga_products_cache') || '[]');
+    getCachedProducts().then(cached => {
       setCacheSize(cached.length);
-    } catch {
-      setCacheSize(0);
-    }
+    }).catch(() => setCacheSize(0));
 
     // Count saved favorites
     try {
@@ -103,10 +102,10 @@ export default function UserSettingsPage() {
   const handleRefreshCache = async () => {
     setIsRefreshingCache(true);
     try {
-      const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'), limit(50));
+      const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'), limit(20));
       const snapshot = await getDocs(q);
-      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      localStorage.setItem('waga_products_cache', JSON.stringify(fetched));
+      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+      await saveProductsCache(fetched);
       setCacheSize(fetched.length);
       setStatusMessage({
         type: 'success',
@@ -124,9 +123,9 @@ export default function UserSettingsPage() {
     }
   };
 
-  const handleClearCache = () => {
+  const handleClearCache = async () => {
     if (window.confirm(language === 'FR' ? 'Voulez-vous vider le cache des articles ? Vos favoris seront conservés.' : 'Clear cached product list? Your saved items will remain.')) {
-      localStorage.removeItem('waga_products_cache');
+      await clearAllProductsCache();
       setCacheSize(0);
       setStatusMessage({
         type: 'info',

@@ -2,6 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Product, Seller } from '../types';
+import { 
+  getInitialProductsSync, 
+  getCachedProducts, 
+  saveProductsCache, 
+  shouldFetchFromNetwork,
+  getRecentlyViewed 
+} from '../lib/productCache';
 import { Link, useNavigate } from 'react-router-dom';
 import { formatPrice } from '../lib/utils';
 import { Zap, Heart, Store, ArrowRight, Sparkles, MessageCircle, ShieldCheck, ShoppingBag, Search as SearchIcon, MapPin, SlidersHorizontal, X, Check, Globe, Clock, Filter, Mic, Award, UserCheck, RefreshCw, ArrowDown, Loader2, Share2 } from 'lucide-react';
@@ -15,23 +22,9 @@ import { BURKINA_CITIES } from '../constants/cities';
 
 
 export default function HomePage() {
-  const [products, setProducts] = useState<Product[]>(() => {
-    try {
-      const cached = localStorage.getItem('waga_products_cache') || sessionStorage.getItem('waga_products_cache');
-      return cached ? JSON.parse(cached) : [];
-    } catch {
-      return [];
-    }
-  });
-  const [recentProducts, setRecentProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(() => {
-    try {
-      const cached = localStorage.getItem('waga_products_cache') || sessionStorage.getItem('waga_products_cache');
-      return !cached || JSON.parse(cached).length === 0;
-    } catch {
-      return true;
-    }
-  });
+  const [products, setProducts] = useState<Product[]>(getInitialProductsSync);
+  const [recentProducts, setRecentProducts] = useState<Product[]>(getRecentlyViewed);
+  const [loading, setLoading] = useState(() => getInitialProductsSync().length === 0);
   const [searchTerm, setSearchTerm] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -53,8 +46,25 @@ export default function HomePage() {
 
   const fetchData = async (isManualRefresh = false) => {
     if (isManualRefresh) setIsRefreshing(true);
+
+    // 1. Immediately ensure rich cached data from IndexedDB is in state
     try {
-      const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'), limit(50));
+      const cached = await getCachedProducts();
+      if (cached.length > 0) {
+        setProducts(cached);
+        setLoading(false);
+      }
+    } catch {}
+
+    // 2. Check if we should query Firestore (prevents network hangs when offline, saves Firebase reads)
+    if (!shouldFetchFromNetwork(isManualRefresh)) {
+      setLoading(false);
+      if (isManualRefresh) setIsRefreshing(false);
+      return;
+    }
+
+    try {
+      const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'), limit(20));
       let fetchedProducts: Product[] = [];
       let fetchSucceeded = false;
       try {
@@ -65,17 +75,7 @@ export default function HomePage() {
         })) as Product[];
         fetchSucceeded = true;
       } catch (err) {
-        console.warn("Firestore fetch error, fallback to offline/cached products:", err);
-      }
-
-      // If network fetch failed, preserve cached products
-      if (!fetchSucceeded) {
-        try {
-          const cached = localStorage.getItem('waga_products_cache');
-          if (cached) {
-            fetchedProducts = JSON.parse(cached);
-          }
-        } catch {}
+        console.warn("Firestore fetch error, preserving offline/cached products:", err);
       }
 
       // Merge local offline products queue if present
@@ -88,14 +88,15 @@ export default function HomePage() {
         }
       } catch {}
 
-      if (fetchedProducts.length > 0 || fetchSucceeded) {
-        setProducts(fetchedProducts);
-      }
-
       if (fetchSucceeded && fetchedProducts.length > 0) {
-        try {
-          localStorage.setItem('waga_products_cache', JSON.stringify(fetchedProducts));
-        } catch {}
+        setProducts(fetchedProducts);
+        await saveProductsCache(fetchedProducts);
+      } else if (!fetchSucceeded) {
+        // Network failed (e.g. offline), re-verify cached products are displayed
+        const fallback = await getCachedProducts();
+        if (fallback.length > 0) {
+          setProducts(fallback);
+        }
       }
     } catch (error) {
       console.error("Error fetching homepage data:", error);
@@ -107,13 +108,7 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    try {
-      const recent = localStorage.getItem('waga_recently_viewed');
-      if (recent) {
-        setRecentProducts(JSON.parse(recent));
-      }
-    } catch {}
-
+    setRecentProducts(getRecentlyViewed());
     fetchData();
   }, []);
 

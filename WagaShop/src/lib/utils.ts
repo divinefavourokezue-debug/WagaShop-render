@@ -24,7 +24,7 @@ export async function compressImage(file: File): Promise<File> {
       const canvas = document.createElement('canvas');
       let width = img.width;
       let height = img.height;
-      const maxDim = 900;
+      const maxDim = 600;
 
       if (width > maxDim || height > maxDim) {
         if (width > height) {
@@ -55,7 +55,7 @@ export async function compressImage(file: File): Promise<File> {
             }
           },
           'image/jpeg',
-          0.75
+          0.6
         );
       } else {
         resolve(file);

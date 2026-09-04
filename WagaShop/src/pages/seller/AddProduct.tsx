@@ -5,6 +5,8 @@ import { collection, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../lib/firebase';
 import { compressImage, safeFileToDataUrl } from '../../lib/utils';
+import { upsertProductInCache } from '../../lib/productCache';
+import { Product } from '../../types';
 import { ArrowLeft, Upload, X, Loader2, Sparkles, MapPin, Phone, Globe, Clock, CheckCircle2, Store } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { CATEGORIES, getCategoryTranslation } from '../../constants/categories';
@@ -230,10 +232,8 @@ export default function AddProduct() {
 
       // Prepend to product caches immediately so it appears instantly across homepage, seller dashboard, and search
       try {
-        const fullItem = { ...productPayload, id: docRefId || ('local_' + Date.now()) };
-        const cachedAll = JSON.parse(localStorage.getItem('waga_products_cache') || '[]');
-        const updatedAll = [fullItem, ...cachedAll.filter((p: any) => p.id !== fullItem.id)];
-        localStorage.setItem('waga_products_cache', JSON.stringify(updatedAll));
+        const fullItem = { ...productPayload, id: docRefId || ('local_' + Date.now()) } as Product;
+        upsertProductInCache(fullItem).catch(console.warn);
 
         if (user) {
           const cachedSeller = JSON.parse(localStorage.getItem(`waga_cached_seller_prods_${user.uid}`) || '[]');

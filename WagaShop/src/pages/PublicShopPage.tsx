@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Product, Seller } from '../types';
+import { getCachedProducts } from '../lib/productCache';
 import { formatPrice } from '../lib/utils';
 import { Store, MapPin, CheckCircle2, ArrowLeft, Phone, Share2, PackageSearch, Globe } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -18,6 +19,25 @@ export default function PublicShopPage() {
   useEffect(() => {
     const fetchShop = async () => {
       if (!id) return;
+
+      // 1. Immediately check cache for this seller's products
+      let foundInCache = false;
+      try {
+        const cachedProds = await getCachedProducts();
+        const shopProds = cachedProds.filter(p => p.sellerId === id);
+        if (shopProds.length > 0) {
+          setProducts(shopProds);
+          setLoading(false);
+          foundInCache = true;
+        }
+      } catch {}
+
+      // If offline and we found cached products, return
+      if (typeof navigator !== 'undefined' && !navigator.onLine && foundInCache) {
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       try {
         const sellerRef = doc(db, 'sellers', id);
@@ -39,15 +59,7 @@ export default function PublicShopPage() {
           setProducts(fetchedProducts);
         }
       } catch (error) {
-        console.error("Error fetching shop data:", error);
-        // Fallback to cache
-        try {
-          const cachedProds: Product[] = JSON.parse(localStorage.getItem('waga_products_cache') || '[]');
-          const shopProds = cachedProds.filter(p => p.sellerId === id);
-          if (shopProds.length > 0) {
-            setProducts(shopProds);
-          }
-        } catch {}
+        console.warn("Error fetching shop data from network, using cached products:", error);
       } finally {
         setLoading(false);
       }

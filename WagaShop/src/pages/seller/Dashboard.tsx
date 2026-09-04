@@ -4,6 +4,7 @@ import { useNavigate, Link, useLocation, useSearchParams } from 'react-router-do
 import { collection, query, where, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../../lib/firebase';
 import { Product } from '../../types';
+import { removeProductFromCache } from '../../lib/productCache';
 import { Store, Plus, Settings, LogOut, TrendingUp, Package, Eye, CheckCircle2, MapPin, Loader2, Share2, Hourglass, Rocket } from 'lucide-react';
 import { formatPrice } from '../../lib/utils';
 import { signOut } from 'firebase/auth';
@@ -188,10 +189,7 @@ export default function SellerDashboard() {
             localStorage.setItem(`waga_cached_seller_prods_${user.uid}`, JSON.stringify(cached.filter((p: any) => p.id !== productId)));
           } catch {}
         }
-        try {
-          const cachedAll = JSON.parse(localStorage.getItem('waga_products_cache') || '[]');
-          localStorage.setItem('waga_products_cache', JSON.stringify(cachedAll.filter((p: any) => p.id !== productId)));
-        } catch {}
+        removeProductFromCache(productId).catch(console.warn);
 
         setProducts(products.filter(p => p.id !== productId));
         setNotification({
