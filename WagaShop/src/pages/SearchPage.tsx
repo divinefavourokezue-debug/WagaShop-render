@@ -37,7 +37,7 @@ export default function SearchPage() {
       let fetched: Product[] = [];
       let fetchSucceeded = false;
       try {
-        const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'), limit(100));
+        const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'), limit(300));
         const snapshot = await getDocs(q);
         fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
         fetchSucceeded = true;

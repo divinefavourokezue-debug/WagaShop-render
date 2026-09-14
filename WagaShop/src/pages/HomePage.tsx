@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { collection, query, orderBy, limit, where, getDocs, startAfter, DocumentData } from 'firebase/firestore';
+import { collection, query, orderBy, limit, where, getDocs, startAfter, DocumentData, getCountFromServer } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Product, Seller } from '../types';
 import { 
@@ -28,6 +28,7 @@ export default function HomePage() {
   const [lastVisible, setLastVisible] = useState<DocumentData | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -53,14 +54,14 @@ export default function HomePage() {
     // 1. Immediately ensure rich cached data from IndexedDB is in state
     try {
       const cached = await getCachedProducts();
-      if (cached.length > 0) {
+      if (cached.length > 0 && !selectedCategory && (!selectedLocation || selectedLocation === 'Toutes')) {
         setProducts(cached);
         setLoading(false);
       }
     } catch {}
 
     // 2. Check if we should query Firestore (prevents network hangs when offline, saves Firebase reads)
-    if (!shouldFetchFromNetwork(isManualRefresh)) {
+    if (!shouldFetchFromNetwork(isManualRefresh) && !selectedCategory && (!selectedLocation || selectedLocation === 'Toutes')) {
       setLoading(false);
       if (isManualRefresh) setIsRefreshing(false);
       return;
@@ -78,8 +79,17 @@ export default function HomePage() {
       }
       
       qBuilder.push(orderBy('createdAt', 'desc'));
-      qBuilder.push(limit(24));
       
+      // Get exact count for this query
+      try {
+        const countQuery = query(collection(db, 'products'), ...(qBuilder as any[]));
+        const countSnap = await getCountFromServer(countQuery);
+        setTotalCount(countSnap.data().count);
+      } catch (e) {
+        console.warn("Could not get count", e);
+      }
+
+      qBuilder.push(limit(24));
       const q = query(collection(db, 'products'), ...(qBuilder as any[]));
       let fetchedProducts: Product[] = [];
       let fetchSucceeded = false;
@@ -182,6 +192,21 @@ export default function HomePage() {
     setLoading(true);
     fetchData(false);
   }, [selectedCategory, selectedLocation]);
+
+  // Infinite Scroll Listener
+  useEffect(() => {
+    const handleScroll = () => {
+      // If we are within 600px of the bottom of the page, trigger load more
+      if (window.innerHeight + document.documentElement.scrollTop >= document.documentElement.offsetHeight - 600) {
+        if (hasMore && !loadingMore && !searchTerm) {
+          loadMore();
+        }
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [hasMore, loadingMore, searchTerm, lastVisible, selectedCategory, selectedLocation]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (window.scrollY <= 2 && !isRefreshing) {
@@ -607,7 +632,7 @@ export default function HomePage() {
             )}
           </div>
           <span className="text-[10px] uppercase text-red-600 dark:text-red-500 font-bold tracking-widest">
-            {filteredProducts.length} {t('articles')}
+            {searchTerm ? filteredProducts.length : (totalCount !== null ? totalCount : filteredProducts.length)} {t('articles')}
           </span>
         </div>
         
@@ -652,16 +677,16 @@ export default function HomePage() {
               ))}
             </div>
             
-            {hasMore && filteredProducts.length > 0 && !searchTerm && selectedCategory === null && (
-              <div className="mt-8 flex justify-center">
-                <button 
-                  onClick={loadMore} 
-                  disabled={loadingMore}
-                  className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-200 font-bold px-8 py-3 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
-                >
-                  {loadingMore ? <Loader2 size={18} className="animate-spin" /> : <ArrowDown size={18} />}
-                  {language === 'FR' ? 'Voir plus' : 'Load more'}
-                </button>
+            {hasMore && filteredProducts.length > 0 && !searchTerm && (
+              <div className="mt-12 mb-4 flex flex-col items-center justify-center text-slate-500 dark:text-slate-400">
+                {loadingMore ? (
+                  <>
+                    <Loader2 size={28} className="animate-spin text-red-600 dark:text-red-500 mb-2" />
+                    <span className="text-sm font-bold animate-pulse">{language === 'FR' ? 'Chargement...' : 'Loading...'}</span>
+                  </>
+                ) : (
+                  <span className="text-sm font-medium opacity-0">Scroll for more</span>
+                )}
               </div>
             )}
           </>
