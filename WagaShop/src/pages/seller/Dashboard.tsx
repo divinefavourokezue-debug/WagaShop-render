@@ -123,7 +123,8 @@ export default function SellerDashboard() {
       try {
         const q = query(collection(db, 'products'), where('sellerId', '==', user.uid));
         const snapshot = await getDocs(q);
-        fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+        fetched = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) })) as Product[];
+fetched.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         fetchSucceeded = true;
       } catch (error) {
         console.error("Error fetching products:", error);
@@ -134,6 +135,7 @@ export default function SellerDashboard() {
           const cached = localStorage.getItem(`waga_cached_seller_prods_${user.uid}`);
           if (cached) {
             fetched = JSON.parse(cached);
+fetched.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
           }
         } catch {}
       }

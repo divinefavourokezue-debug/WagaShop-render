@@ -102,7 +102,7 @@ export default function UserSettingsPage() {
   const handleRefreshCache = async () => {
     setIsRefreshingCache(true);
     try {
-      const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'), limit(20));
+      const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'), limit(100));
       const snapshot = await getDocs(q);
       const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
       await saveProductsCache(fetched);

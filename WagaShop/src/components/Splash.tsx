@@ -9,7 +9,7 @@ import { useLanguageTheme } from '../context/LanguageThemeContext';
 
 export function Splash({ children }: { children: React.ReactNode }) {
   const [showSplash, setShowSplash] = useState(true);
-  const [countdown, setCountdown] = useState(10);
+  const [countdown, setCountdown] = useState(5);
   const [activeStep, setActiveStep] = useState(0);
   const [progress, setProgress] = useState(0);
   const { language, setLanguage } = useLanguageTheme();
@@ -73,7 +73,7 @@ export function Splash({ children }: { children: React.ReactNode }) {
   }, [progress]);
 
   useEffect(() => {
-    const totalDuration = 10000; // 10 seconds exactly
+    const totalDuration = 5000; // 5 seconds exactly
 
     // Countdown interval (10 to 0)
     const countdownInterval = setInterval(() => {
@@ -83,7 +83,7 @@ export function Splash({ children }: { children: React.ReactNode }) {
     // Step transition (every 2.5 seconds for 4 steps)
     const stepInterval = setInterval(() => {
       setActiveStep((prev) => (prev + 1) % 4);
-    }, 2500);
+    }, 1250);
 
     // Precision smooth progress
     const startTime = Date.now();

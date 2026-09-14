@@ -6,12 +6,24 @@ import { useLanguageTheme } from '../context/LanguageThemeContext';
 
 export const WelcomeGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { language, setLanguage } = useLanguageTheme();
+
   const [hasSeenWelcome, setHasSeenWelcome] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && window.location.pathname === '/promo') {
+      return true;
+    }
     return localStorage.getItem('waga_welcome_v2') === 'true';
   });
+
   
   const [showOptions, setShowOptions] = useState(true);
   const navigate = useNavigate();
+  useEffect(() => {
+    if (window.location.pathname === '/promo') {
+      setHasSeenWelcome(true);
+      localStorage.setItem('waga_welcome_v2', 'true');
+    }
+  }, []);
+
 
   const handleChoice = (path: string) => {
     localStorage.setItem('waga_welcome_v2', 'true');

@@ -14,6 +14,7 @@ import AddProduct from './pages/seller/AddProduct';
 import SellerSettings from './pages/seller/Settings';
 import UserSettingsPage from './pages/UserSettingsPage';
 import { Splash } from './components/Splash';
+import PromoVideo from './pages/PromoVideo';
 import { WelcomeGuard } from './components/WelcomeGuard';
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
           <BrowserRouter>
             <WelcomeGuard>
               <Routes>
+                <Route path="/promo" element={<PromoVideo />} />
                 <Route path="/" element={<Layout />}>
                   <Route index element={<HomePage />} />
                   <Route path="product/:id" element={<ProductPage />} />

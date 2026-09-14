@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Search, Heart, Globe, Sun, Moon, Bell, PlusCircle, Phone, Menu, X, Settings as SettingsIcon, User } from 'lucide-react';
+import TutorialModal from './TutorialModal';
+import { Home, Search, Heart, Globe, Sun, Moon, Bell, PlusCircle, Phone, Menu, X, Settings as SettingsIcon, User, HelpCircle } from 'lucide-react';
 import { useAuth } from './AuthProvider';
 import { useLanguageTheme } from '../context/LanguageThemeContext';
 import { OfflineIndicator } from './OfflineIndicator';
@@ -19,7 +20,16 @@ export function Layout() {
 
 
 
+  const [isTutorialOpen, setIsTutorialOpen] = useState<boolean>(false);
   const isDark = theme === 'dark';
+
+  useEffect(() => {
+    const hasSeenTutorial = localStorage.getItem('waga_has_seen_tutorial');
+    if (!hasSeenTutorial) {
+      setIsTutorialOpen(true);
+      localStorage.setItem('waga_has_seen_tutorial', 'true');
+    }
+  }, []);
 
   // Listen for share target parameters
   useEffect(() => {
@@ -137,6 +147,8 @@ export function Layout() {
             </div>
           </div>
         </Link>
+
+
         
         <div className="flex items-center gap-3 md:gap-6">
           {/* Desktop Nav */}
@@ -157,6 +169,8 @@ export function Layout() {
                   <item.icon size={16} className={isActive ? (isDark ? "text-red-500" : "text-white") : ""} />
                   {item.name}
                 </Link>
+
+
               );
             })}
           </nav>
@@ -194,6 +208,20 @@ export function Layout() {
                 <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-white dark:border-zinc-950" />
               )}
             </Link>
+
+            <button
+              onClick={() => setIsTutorialOpen(true)}
+              aria-label={language === 'FR' ? "Comment ça marche" : "How it works"}
+              title={language === 'FR' ? "Comment ça marche" : "How it works"}
+              className={cn(
+                "flex items-center justify-center w-8 h-8 rounded-xl transition-all border cursor-pointer",
+                isDark
+                  ? "bg-zinc-900 border-white/10 text-zinc-300 hover:text-white hover:border-emerald-500/50"
+                  : "bg-zinc-100 border-zinc-200 text-zinc-700 hover:text-emerald-600 hover:border-emerald-300"
+              )}
+            >
+              <HelpCircle size={15} />
+            </button>
           </div>
         </div>
       </header>
@@ -202,6 +230,7 @@ export function Layout() {
       <main className="flex-1 w-full max-w-7xl mx-auto md:p-8 p-4">
         <Outlet />
       </main>
+      <TutorialModal isOpen={isTutorialOpen} onClose={() => setIsTutorialOpen(false)} />
 
       {/* FLOATING DARK / LIGHT THEME TOGGLE (FAB) */}
       <button
@@ -250,10 +279,14 @@ export function Layout() {
           <Link to="/settings" className="text-xs font-semibold text-zinc-500 hover:text-red-600 dark:text-zinc-400 dark:hover:text-red-500 transition-colors">
             {language === 'FR' ? 'Paramètres' : 'Settings'}
           </Link>
+
+
           
           <Link to="/privacy" className="text-xs font-semibold text-zinc-500 hover:text-red-600 dark:text-zinc-400 dark:hover:text-red-500 transition-colors">
             {language === 'FR' ? 'Confidentialité' : 'Privacy'}
           </Link>
+
+
         </div>
 
         <p className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">© {new Date().getFullYear()} D.Vortex. {t('allRightsReserved')}</p>
@@ -306,6 +339,8 @@ export function Layout() {
                       {item.name}
                     </span>
                   </Link>
+
+
                 );
               })}
 
@@ -324,6 +359,8 @@ export function Layout() {
                   {language === 'FR' ? 'Paramètres' : 'Settings'}
                 </span>
               </Link>
+
+
             </motion.div>
           )}
         </AnimatePresence>

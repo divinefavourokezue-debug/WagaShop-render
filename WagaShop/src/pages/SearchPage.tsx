@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Product } from '../types';
 import { getInitialProductsSync, getCachedProducts, saveProductsCache, shouldFetchFromNetwork } from '../lib/productCache';
@@ -37,7 +37,7 @@ export default function SearchPage() {
       let fetched: Product[] = [];
       let fetchSucceeded = false;
       try {
-        const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
+        const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'), limit(100));
         const snapshot = await getDocs(q);
         fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
         fetchSucceeded = true;

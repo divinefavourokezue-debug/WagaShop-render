@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, limit, where, getDocs, startAfter, DocumentData } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Product, Seller } from '../types';
 import { 
@@ -25,6 +25,9 @@ export default function HomePage() {
   const [products, setProducts] = useState<Product[]>(getInitialProductsSync);
   const [recentProducts, setRecentProducts] = useState<Product[]>(getRecentlyViewed);
   const [loading, setLoading] = useState(() => getInitialProductsSync().length === 0);
+  const [lastVisible, setLastVisible] = useState<DocumentData | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -64,15 +67,35 @@ export default function HomePage() {
     }
 
     try {
-      const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'), limit(20));
+      let qBuilder: any[] = [];
+      if (selectedCategory) {
+        // Special case for 'Services Digitaux' mapping
+        const catValue = selectedCategory === 'Services Digitaux' ? 'services-digitaux' : selectedCategory;
+        qBuilder.push(where('category', 'in', [catValue, selectedCategory]));
+      }
+      if (selectedLocation && selectedLocation !== 'Toutes') {
+        qBuilder.push(where('location', '==', selectedLocation));
+      }
+      
+      qBuilder.push(orderBy('createdAt', 'desc'));
+      qBuilder.push(limit(24));
+      
+      const q = query(collection(db, 'products'), ...(qBuilder as any[]));
       let fetchedProducts: Product[] = [];
       let fetchSucceeded = false;
       try {
         const snapshot = await getDocs(q);
         fetchedProducts = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as object)
         })) as Product[];
+        
+        if (snapshot.docs.length > 0) {
+          setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+          setHasMore(snapshot.docs.length === 24);
+        } else {
+          setHasMore(false);
+        }
         fetchSucceeded = true;
       } catch (err) {
         console.warn("Firestore fetch error, preserving offline/cached products:", err);
@@ -90,7 +113,7 @@ export default function HomePage() {
 
       if (fetchSucceeded && fetchedProducts.length > 0) {
         setProducts(fetchedProducts);
-        await saveProductsCache(fetchedProducts);
+        if (!selectedCategory && (!selectedLocation || selectedLocation === 'Toutes')) { await saveProductsCache(fetchedProducts); }
       } else if (!fetchSucceeded) {
         // Network failed (e.g. offline), re-verify cached products are displayed
         const fallback = await getCachedProducts();
@@ -107,10 +130,58 @@ export default function HomePage() {
     }
   };
 
+
+  const loadMore = async () => {
+    if (!lastVisible || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      let qBuilder: any[] = [];
+      if (selectedCategory) {
+        const catValue = selectedCategory === 'Services Digitaux' ? 'services-digitaux' : selectedCategory;
+        qBuilder.push(where('category', 'in', [catValue, selectedCategory]));
+      }
+      if (selectedLocation && selectedLocation !== 'Toutes') {
+        qBuilder.push(where('location', '==', selectedLocation));
+      }
+      qBuilder.push(orderBy('createdAt', 'desc'));
+      qBuilder.push(startAfter(lastVisible));
+      qBuilder.push(limit(24));
+      
+      const q = query(collection(db, 'products'), ...(qBuilder as any[]));
+      
+      const snapshot = await getDocs(q);
+      const newProducts = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...(doc.data() as object)
+      })) as Product[];
+      
+      if (snapshot.docs.length > 0) {
+        setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+        setProducts(prev => {
+          const combined = [...prev, ...newProducts];
+          // deduplicate by id just in case
+          const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
+          if (!selectedCategory && (!selectedLocation || selectedLocation === 'Toutes')) { saveProductsCache(unique); }
+          return unique;
+        });
+        setHasMore(snapshot.docs.length === 24);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error("Error loading more products:", error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Fetch data on mount AND when category/location filters change
   useEffect(() => {
     setRecentProducts(getRecentlyViewed());
-    fetchData();
-  }, []);
+    setProducts([]); // Clear existing to show loading state for new category
+    setLoading(true);
+    fetchData(false);
+  }, [selectedCategory, selectedLocation]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (window.scrollY <= 2 && !isRefreshing) {
@@ -574,11 +645,26 @@ export default function HomePage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filteredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {filteredProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+            
+            {hasMore && filteredProducts.length > 0 && !searchTerm && selectedCategory === null && (
+              <div className="mt-8 flex justify-center">
+                <button 
+                  onClick={loadMore} 
+                  disabled={loadingMore}
+                  className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-200 font-bold px-8 py-3 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
+                >
+                  {loadingMore ? <Loader2 size={18} className="animate-spin" /> : <ArrowDown size={18} />}
+                  {language === 'FR' ? 'Voir plus' : 'Load more'}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
 
